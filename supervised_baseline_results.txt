@@ -1,0 +1,32 @@
+================================================
+SUPERVISED BASELINE - RANDOM FOREST
+================================================
+Dataset: Friday-WorkingHours-Afternoon-DDos.pcap_ISCX.csv
+Label mapping: BENIGN = 0, ATTACK = 1
+Feature count: 47
+Train samples: 157997
+Test samples: 67714
+
+Accuracy : 0.999705
+Precision: 0.999896
+Recall   : 0.999583
+F1-score : 0.999740
+
+Confusion Matrix [[TN, FP], [FN, TP]]:
+[[29302, 4], [16, 38392]]
+
+Classification Report:
+              precision    recall  f1-score   support
+
+      BENIGN     0.9995    0.9999    0.9997     29306
+      ATTACK     0.9999    0.9996    0.9997     38408
+
+    accuracy                         0.9997     67714
+   macro avg     0.9997    0.9997    0.9997     67714
+weighted avg     0.9997    0.9997    0.9997     67714
+
+
+Ghi chu:
+- Day la supervised baseline dung de so sanh voi Autoencoder unsupervised.
+- Supervised model can label khi train.
+- Autoencoder khong can label attack khi train, phat hien anomaly bang reconstruction error.

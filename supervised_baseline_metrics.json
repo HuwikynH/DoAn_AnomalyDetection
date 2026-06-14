@@ -1,0 +1,26 @@
+{
+  "dataset": "/kaggle/input/datasets/nguyenhuuhuynh/cicids2017/MachineLearningCVE/Friday-WorkingHours-Afternoon-DDos.pcap_ISCX.csv",
+  "model": "RandomForestClassifier",
+  "features": 47,
+  "train_samples": 157997,
+  "test_samples": 67714,
+  "label_mapping": {
+    "BENIGN": 0,
+    "ATTACK": 1
+  },
+  "accuracy": 0.9997046401039666,
+  "precision": 0.9998958224815085,
+  "recall": 0.9995834201208081,
+  "f1_score": 0.999739596895995,
+  "confusion_matrix": [
+    [
+      29302,
+      4
+    ],
+    [
+      16,
+      38392
+    ]
+  ],
+  "classification_report": "              precision    recall  f1-score   support\n\n      BENIGN     0.9995    0.9999    0.9997     29306\n      ATTACK     0.9999    0.9996    0.9997     38408\n\n    accuracy                         0.9997     67714\n   macro avg     0.9997    0.9997    0.9997     67714\nweighted avg     0.9997    0.9997    0.9997     67714\n"
+}
