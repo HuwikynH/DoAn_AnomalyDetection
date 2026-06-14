@@ -2,7 +2,7 @@
 
 ## 1. Thông tin nhóm
 
-- Sinh viên: Nguyễn Hữu Huyn - N22DCCN135
+- Sinh viên: Nguyễn Hữu Huynh - N22DCCN135
 - Sinh viên: Nguyễn Đức Lộc - N22DCCN150
 - Đề tài: Phát hiện bất thường trong log hệ thống và network traffic đáp ứng thời gian thực bằng Autoencoder
 - Giảng viên hướng dẫn: ThS. Đàm Minh Linh
@@ -109,9 +109,9 @@ DoAn_1506/
   - LSTM 32
   - TimeDistributed Dense 4
 
-## 7. Dynamic threshold
+## 7. Adaptive dynamic threshold
 
-Hệ thống dùng ngưỡng động:
+Hệ thống dùng ngưỡng động theo 2 tầng:
 
 ```text
 threshold = mean(MSE_calibration) + 3 * std(MSE_calibration)
@@ -119,16 +119,32 @@ threshold = mean(MSE_calibration) + 3 * std(MSE_calibration)
 
 Trong runtime local:
 
-- Traffic dùng 100 mẫu `BENIGN` đầu để calibration.
-- Log dùng 100 sequence đầu để calibration.
-- Sau calibration, hệ thống bắt đầu quét stream và so sánh MSE với threshold.
+- Tầng 1: Traffic dùng 100 mẫu `BENIGN` đầu để tạo threshold ban đầu.
+- Tầng 1: Log dùng 100 sequence đầu để tạo threshold ban đầu.
+- Tầng 2: Khi streaming đang chạy, threshold tiếp tục được cập nhật bằng rolling window 100 MSE mới nhất.
 
-Kết quả threshold trong lần chạy local gần nhất:
+Quy tắc cập nhật rolling threshold:
 
-| Loại | Threshold |
-|---|---:|
-| Traffic | 0.00044971 |
-| Log | 0.05503221 |
+```text
+Sau mỗi sample:
+    đưa MSE mới vào rolling_window
+    chỉ giữ lại 100 MSE mới nhất
+    threshold_mới = mean(rolling_window) + 3 * std(rolling_window)
+```
+
+Trong `system_alert_log.txt`, mỗi dòng sẽ có thêm:
+
+- `Traffic_Threshold`
+- `Log_Threshold`
+
+Cuối log sẽ có:
+
+- `Initial Traffic Threshold`
+- `Final Traffic Threshold`
+- `Traffic Threshold Updates`
+- `Initial Log Threshold`
+- `Final Log Threshold`
+- `Log Threshold Updates`
 
 ## 8. Pipeline streaming
 
@@ -172,23 +188,34 @@ Kết quả lấy từ `system_alert_log.txt`:
 |---|---:|
 | Total Traffic Processed | 2000 |
 | Total Log Sequences Processed | 2000 |
-| Traffic Alerts | 1237 |
-| Traffic Anomaly Rate | 61.85% |
+| Traffic Alerts | 1243 |
+| Traffic Anomaly Rate | 62.15% |
 | Actual Attack Flows | 1900 |
-| Detected Attack Flows | 1235 |
-| Detection Rate | 65.00% |
-| False Positive | 2 |
-| False Positive Rate | 2.00% |
+| Detected Attack Flows | 1240 |
+| Detection Rate | 65.26% |
+| False Positive | 3 |
+| False Positive Rate | 3.00% |
 | Log Alerts | 10 |
 | Log Anomaly Rate | 0.50% |
-| Hybrid Alerts | 1242 |
-| Hybrid Anomaly Rate | 62.10% |
+| Hybrid Alerts | 1248 |
+| Hybrid Anomaly Rate | 62.40% |
 | Both Traffic and Log Alerts | 5 |
-| Total Runtime | 138.93 seconds |
-| Average Latency | 69.32 ms |
-| Max Latency | 171.30 ms |
-| Average RAM | 628.60 MB |
-| Peak RAM | 628.72 MB |
+| Total Runtime | 142.77 seconds |
+| Average Latency | 71.24 ms |
+| Max Latency | 354.04 ms |
+| Average RAM | 629.21 MB |
+| Peak RAM | 629.40 MB |
+
+Adaptive threshold summary:
+
+| Chỉ số | Giá trị |
+|---|---:|
+| Initial Traffic Threshold | 0.00044971 |
+| Final Traffic Threshold | 0.00035481 |
+| Traffic Threshold Updates | 757 |
+| Initial Log Threshold | 0.05503221 |
+| Final Log Threshold | 0.05744186 |
+| Log Threshold Updates | 1990 |
 
 ## 11. Supervised baseline để so sánh
 
@@ -277,6 +304,7 @@ Khi chạy đúng, notebook sẽ:
 - Load 2 Autoencoder model bằng `compile=False`.
 - Load 2 scaler `.pkl`.
 - Calibration dynamic threshold bằng 100 mẫu đầu.
+- Cập nhật adaptive threshold bằng rolling window trong lúc streaming.
 - Chạy 3 thread streaming.
 - In trạng thái realtime.
 - Ghi log vào `system_alert_log.txt`.
@@ -312,5 +340,5 @@ Nếu bị hỏi hạn chế:
 - Bổ sung live packet capture bằng Scapy hoặc tshark.
 - Dùng dataset traffic-log đồng bộ timestamp để correlation thật.
 - Lưu riêng encoder cho log preprocessing.
-- Thử thêm threshold percentile hoặc adaptive window.
+- Thử thêm threshold percentile hoặc so sánh nhiều kích thước rolling window khác nhau.
 - Thử thêm các supervised baseline khác như SVM, Logistic Regression hoặc XGBoost.
