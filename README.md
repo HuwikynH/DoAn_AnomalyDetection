@@ -1,179 +1,316 @@
-# ĐỒ ÁN: PHÁT HIỆN BẤT THƯỜNG TRONG LOG VÀ NETWORK TRAFFIC
+# Đồ án: Phát hiện bất thường trong log hệ thống và network traffic bằng Autoencoder
 
-## 1. Tổng quan dự án
+## 1. Thông tin nhóm
 
-Đây là hệ thống giám sát an ninh mạng theo thời gian thực (Real-time Cybersecurity Monitoring System), được xây dựng dựa trên kiến trúc **Streaming Pipeline đa luồng** nhằm phân tích đồng thời dữ liệu **Network Traffic** và **System Log**.
+- Sinh viên: Nguyễn Hữu Huyn - N22DCCN135
+- Sinh viên: Nguyễn Đức Lộc - N22DCCN150
+- Đề tài: Phát hiện bất thường trong log hệ thống và network traffic đáp ứng thời gian thực bằng Autoencoder
+- Giảng viên hướng dẫn: ThS. Đàm Minh Linh
 
-Dự án ứng dụng phương pháp **Học máy không giám sát (Unsupervised Learning)** thông qua các mô hình Autoencoder để tự động phát hiện các hành vi bất thường chưa từng xuất hiện trong dữ liệu. Cơ chế phát hiện dựa trên việc đánh giá **Reconstruction Error (Sai số tái tạo)** giữa dữ liệu đầu vào và dữ liệu được mô hình tái tạo lại.
+## 2. Mục tiêu dự án
 
-Hệ thống bao gồm:
-- Deep Autoencoder phát hiện bất thường trong lưu lượng mạng.
-- LSTM Autoencoder phân tích và phát hiện bất thường trong nhật ký hệ thống.
-- Cơ chế Dynamic Threshold tự động xác định ngưỡng cảnh báo.
-- Streaming Pipeline mô phỏng quá trình xử lý dữ liệu thời gian thực.
-- Theo dõi hiệu năng hệ thống thông qua Latency và Memory Usage.
+Dự án xây dựng một hệ thống demo giám sát bất thường theo thời gian thực, xử lý đồng thời hai nguồn dữ liệu:
 
----
+- Network traffic từ bộ CICIDS2017.
+- System log từ bộ HDFS log.
 
-## 2. Cấu trúc thư mục
+Hướng chính của đề tài là **unsupervised learning** bằng Autoencoder. Mô hình học cách tái tạo dữ liệu bình thường, sau đó phát hiện bất thường dựa trên **reconstruction error**. Nếu lỗi tái tạo lớn hơn ngưỡng động, mẫu được xem là anomaly.
 
-```
-DOAN_1506/
-│
+Ngoài mô hình chính bằng Autoencoder, dự án có thêm một baseline **supervised Random Forest** để đáp ứng phần so sánh supervised vs unsupervised.
+
+## 3. Yêu cầu của đề tài và trạng thái hiện tại
+
+| Yêu cầu | Trạng thái |
+|---|---|
+| Phân tích gói tin kết hợp log | Đạt ở mức demo, có `Hybrid_Score` và `Hybrid_Status` |
+| Pipeline streaming 3 thread | Đạt |
+| Deep Autoencoder cho network traffic | Đạt |
+| LSTM Autoencoder cho system log | Đạt |
+| Tính reconstruction error realtime | Đạt |
+| Đo latency và memory usage | Đạt |
+| So sánh supervised vs unsupervised | Đạt, có Random Forest baseline |
+| Phân tích dynamic threshold | Đạt |
+
+## 4. Cấu trúc thư mục
+
+```text
+DoAn_1506/
+├── backups/
 ├── dataset/
-│   ├── Friday-WorkingHours-Afternoon-DDoS.pcap_ISCX.csv
+│   ├── Friday-WorkingHours-Afternoon-DDos.pcap_ISCX.csv
 │   └── HDFS_2k.log_structured.csv
-│
 ├── MachineLearningCSV/
-│   ├── Friday-WorkingHours-Afternoon-DDoS.pcap_ISCX.csv
-│   ├── Friday-WorkingHours-Afternoon-PortScan.pcap_ISCX.csv
-│   ├── Friday-WorkingHours-Morning.pcap_ISCX.csv
-│   ├── Monday-WorkingHours.pcap_ISCX.csv
-│   ├── Thursday-WorkingHours-Afternoon-Infilteration.pcap_ISCX.csv
-│   ├── Thursday-WorkingHours-Morning-WebAttacks.pcap_ISCX.csv
-│   ├── Tuesday-WorkingHours.pcap_ISCX.csv
-│   └── Wednesday-workingHours.pcap_ISCX.csv
-│
+│   └── Các file CICIDS2017 gốc để tham khảo/mở rộng
 ├── models/
 │   ├── deep_autoencoder_traffic.h5
-│   └── lstm_autoencoder_logs.h5
-│
+│   ├── traffic_scaler.pkl
+│   ├── lstm_autoencoder_logs.h5
+│   ├── log_scaler.pkl
+│   └── random_forest_supervised_baseline.pkl
 ├── DoAn_Tong.ipynb
+├── supervised_baseline_random_forest_kaggle.py
+├── supervised_baseline_results.txt
+├── supervised_baseline_metrics.json
+├── system_alert_log.txt
 └── README.md
 ```
 
-### Mô tả thành phần
+## 5. Các file quan trọng
 
-| Thành phần | Mô tả |
+| File/thư mục | Vai trò |
 |---|---|
-| `DoAn_Tong.ipynb` | Tệp mã nguồn chính chứa toàn bộ thuật toán Streaming Pipeline, xử lý đa luồng, cơ chế Dynamic Threshold và giám sát hiệu năng. |
-| `models/` | Thư mục chứa các mô hình AI đã được huấn luyện sẵn. |
-| `deep_autoencoder_traffic.h5` | Mô hình Deep Autoencoder dùng để phát hiện bất thường trong Network Traffic. |
-| `lstm_autoencoder_logs.h5` | Mô hình LSTM Autoencoder dùng để phân tích và phát hiện bất thường trong System Log. |
-| `dataset/` | Chứa dữ liệu đầu vào phục vụ quá trình mô phỏng phát hiện bất thường thời gian thực. |
-| `MachineLearningCSV/` | Lưu trữ toàn bộ dữ liệu gốc của bộ CICIDS2017 phục vụ mục đích tham khảo và mở rộng nghiên cứu, không tham gia trực tiếp vào quá trình chạy hệ thống. |
+| `DoAn_Tong.ipynb` | Notebook chính để chạy pipeline streaming local |
+| `models/deep_autoencoder_traffic.h5` | Deep Autoencoder cho network traffic |
+| `models/traffic_scaler.pkl` | Scaler của 47 feature traffic, không fit lại ở local |
+| `models/lstm_autoencoder_logs.h5` | LSTM Autoencoder cho system log |
+| `models/log_scaler.pkl` | Scaler của log feature, không fit lại ở local |
+| `models/random_forest_supervised_baseline.pkl` | Model supervised baseline train trên Kaggle |
+| `supervised_baseline_random_forest_kaggle.py` | Script train Random Forest supervised trên Kaggle |
+| `supervised_baseline_results.txt` | Kết quả supervised baseline dạng text |
+| `supervised_baseline_metrics.json` | Kết quả supervised baseline dạng JSON |
+| `system_alert_log.txt` | Log realtime và summary của lần chạy local gần nhất |
 
----
+## 6. Mô hình chính: Unsupervised Autoencoder
 
-## 3. Yêu cầu môi trường
+### 6.1. Traffic Deep Autoencoder
 
-### Phiên bản đề xuất
-- Python 3.10 trở lên
-- Visual Studio Code với Jupyter Extension
+- Dataset train: `Monday-WorkingHours.pcap_ISCX.csv`
+- Dữ liệu train: chỉ dùng traffic `BENIGN`
+- Input: 47 feature CICIDS2017
+- Tiền xử lý:
+  - Strip tên cột.
+  - Replace `inf/-inf` bằng `NaN`.
+  - Drop `NaN`.
+  - Clip outlier 1%-99%.
+  - Scale bằng `MinMaxScaler`.
+- Kiến trúc:
+  - Input 47
+  - Dense 128
+  - Dense 64
+  - Dense 32
+  - Bottleneck 16
+  - Dense 32
+  - Dense 64
+  - Dense 128
+  - Output 47 sigmoid
 
-### Cài đặt thư viện
+### 6.2. Log LSTM Autoencoder
 
-Mở Terminal và chạy lệnh:
+- Dataset train: `HDFS_2k.log_structured.csv`
+- Input shape: `10 timestep x 4 feature`
+- Feature log:
+  - `EventId_num`
+  - `Level_num`
+  - `Component_num`
+  - `Pid_norm`
+- Kiến trúc:
+  - LSTM 32
+  - RepeatVector 10
+  - LSTM 32
+  - TimeDistributed Dense 4
 
-```bash
-pip install numpy pandas tensorflow scikit-learn psutil
+## 7. Dynamic threshold
+
+Hệ thống dùng ngưỡng động:
+
+```text
+threshold = mean(MSE_calibration) + 3 * std(MSE_calibration)
 ```
 
----
+Trong runtime local:
 
-## 4. Hướng dẫn khởi chạy
+- Traffic dùng 100 mẫu `BENIGN` đầu để calibration.
+- Log dùng 100 sequence đầu để calibration.
+- Sau calibration, hệ thống bắt đầu quét stream và so sánh MSE với threshold.
 
-### Bước 1: Mở dự án
+Kết quả threshold trong lần chạy local gần nhất:
 
-Mở thư mục dự án bằng **Visual Studio Code**.
+| Loại | Threshold |
+|---|---:|
+| Traffic | 0.00044971 |
+| Log | 0.05503221 |
 
-### Bước 2: Mở Notebook
+## 8. Pipeline streaming
 
-Mở tệp:
+Notebook chính triển khai 3 thread:
 
+| Thread | Vai trò |
+|---|---|
+| `packet_analysis_stream` | Đọc từng flow traffic, đưa vào `traffic_queue` |
+| `log_ingestion_stream` | Đọc từng sequence log, đưa vào `log_queue` |
+| `hybrid_model_inference` | Lấy dữ liệu từ queue, chạy model, tính MSE, đo latency/RAM, ghi log |
+
+Hệ thống tự dừng khi đã xử lý hết dữ liệu traffic và log trong dataset demo.
+
+## 9. Hybrid traffic + log
+
+Vì CICIDS2017 và HDFS là hai dataset độc lập, bản demo chưa correlation thật theo timestamp/IP/process. Để đáp ứng phần kết hợp gói tin và log, hệ thống dùng quyết định hybrid trong cùng pipeline streaming:
+
+```text
+traffic_score = traffic_mse / traffic_threshold
+log_score = log_mse / log_threshold
+hybrid_score = max(traffic_score, log_score)
+hybrid_status = ANOMALY nếu traffic hoặc log bất thường
 ```
+
+Trong `system_alert_log.txt`, mỗi dòng có:
+
+- `Traffic_MSE`
+- `Traffic_Status`
+- `Log_MSE`
+- `Log_Status`
+- `Hybrid_Score`
+- `Hybrid_Status`
+- `Latency_ms`
+- `RAM_MB`
+
+## 10. Kết quả chạy local gần nhất
+
+Kết quả lấy từ `system_alert_log.txt`:
+
+| Chỉ số | Giá trị |
+|---|---:|
+| Total Traffic Processed | 2000 |
+| Total Log Sequences Processed | 2000 |
+| Traffic Alerts | 1237 |
+| Traffic Anomaly Rate | 61.85% |
+| Actual Attack Flows | 1900 |
+| Detected Attack Flows | 1235 |
+| Detection Rate | 65.00% |
+| False Positive | 2 |
+| False Positive Rate | 2.00% |
+| Log Alerts | 10 |
+| Log Anomaly Rate | 0.50% |
+| Hybrid Alerts | 1242 |
+| Hybrid Anomaly Rate | 62.10% |
+| Both Traffic and Log Alerts | 5 |
+| Total Runtime | 138.93 seconds |
+| Average Latency | 69.32 ms |
+| Max Latency | 171.30 ms |
+| Average RAM | 628.60 MB |
+| Peak RAM | 628.72 MB |
+
+## 11. Supervised baseline để so sánh
+
+File `supervised_baseline_random_forest_kaggle.py` dùng để train một mô hình supervised baseline trên Kaggle.
+
+Mục đích của file này:
+
+- Đọc dataset CICIDS2017 Friday DDoS.
+- Dùng cùng 47 feature traffic với Autoencoder.
+- Dùng cột `Label` làm nhãn:
+  - `BENIGN = 0`
+  - `ATTACK = 1`
+- Train `RandomForestClassifier`.
+- Xuất kết quả để đưa vào phần so sánh supervised vs unsupervised.
+
+Kết quả supervised baseline:
+
+| Chỉ số | Giá trị |
+|---|---:|
+| Model | RandomForestClassifier |
+| Feature count | 47 |
+| Train samples | 157997 |
+| Test samples | 67714 |
+| Accuracy | 0.999705 |
+| Precision | 0.999896 |
+| Recall | 0.999583 |
+| F1-score | 0.999740 |
+| Confusion matrix | `[[29302, 4], [16, 38392]]` |
+
+## 12. Vì sao Autoencoder vẫn là unsupervised dù log có Label?
+
+Trong `system_alert_log.txt` có dòng như:
+
+```text
+Label=DDoS | Traffic_MSE=... | Traffic_Status=ANOMALY
+```
+
+Điều này không làm Autoencoder thành supervised.
+
+Khác biệt nằm ở cách dùng label:
+
+| Mô hình | Label được dùng để làm gì? |
+|---|---|
+| Autoencoder unsupervised | Không dùng label để train/inference. Label chỉ dùng để đối chiếu kết quả demo và tính detection rate |
+| Random Forest supervised | Dùng label trực tiếp để train mô hình phân loại `BENIGN/ATTACK` |
+
+Nói ngắn gọn:
+
+```text
+Autoencoder: 47 feature -> reconstruct -> MSE -> threshold -> anomaly
+Random Forest: 47 feature + Label -> học phân loại BENIGN/ATTACK
+```
+
+## 13. Hướng dẫn chạy demo local
+
+### Bước 1: Mở project
+
+Mở thư mục:
+
+```text
+C:\Users\huuhu\Desktop\DoAn_1506
+```
+
+### Bước 2: Mở notebook
+
+Mở file:
+
+```text
 DoAn_Tong.ipynb
 ```
 
-### Bước 3: Chọn môi trường Python
+### Bước 3: Chọn kernel
 
-Chọn Python Kernel phù hợp (khuyến nghị Python 3.10 hoặc cao hơn).
+Chọn kernel Python đang dùng cho project, ví dụ:
 
-### Bước 4: Chạy hệ thống
+```text
+streaming_ai (Python 3.10.x)
+```
 
-Nhấn **Run All** hoặc chạy toàn bộ các ô mã nguồn trong Notebook.
+### Bước 4: Chạy toàn bộ notebook
 
-Sau khi khởi chạy, hệ thống sẽ tự động:
+Nhấn `Run All`.
 
-- Tải các mô hình AI đã huấn luyện.
-- Đọc dữ liệu Network Traffic và System Log.
-- Mô phỏng quá trình Streaming thời gian thực.
-- Tính toán Dynamic Threshold dựa trên 100 mẫu ban đầu.
-- Phát hiện và cảnh báo các mẫu bất thường.
-- Hiển thị các thông số hiệu năng:
-  - Latency (thời gian xử lý)
-  - Memory Usage (mức sử dụng RAM)
+Khi chạy đúng, notebook sẽ:
 
-### Dừng hệ thống
+- Load 2 Autoencoder model bằng `compile=False`.
+- Load 2 scaler `.pkl`.
+- Calibration dynamic threshold bằng 100 mẫu đầu.
+- Chạy 3 thread streaming.
+- In trạng thái realtime.
+- Ghi log vào `system_alert_log.txt`.
+- Tự dừng sau khi xử lý xong dữ liệu.
+- In `FINAL SYSTEM SUMMARY`.
 
-Nhấn nút **Interrupt Kernel** trên thanh công cụ của VS Code để dừng quá trình chạy.
+## 14. Lưu ý quan trọng khi chạy
 
----
+- Không fit scaler mới ở local.
+- Luôn load:
+  - `models/traffic_scaler.pkl`
+  - `models/log_scaler.pkl`
+- Traffic phải dùng đúng 47 feature và đúng thứ tự như lúc train.
+- `Label` chỉ dùng để đánh giá demo, không đưa vào Autoencoder.
+- Nếu load `.h5` lỗi `quantization_config`, notebook đã có hàm load model tương thích để xử lý.
 
-## 5. Kiến trúc và kỹ thuật sử dụng
+## 15. Cách nói khi bảo vệ
 
-### Mô hình phát hiện bất thường
+Câu tóm tắt ngắn:
 
-- **Deep Autoencoder**:
-  - Phân tích các đặc trưng của lưu lượng mạng.
-  - Học biểu diễn của dữ liệu bình thường.
-  - Đánh dấu các mẫu có Reconstruction Error cao là bất thường.
+> Đề tài của nhóm em xây dựng pipeline streaming 3 thread để xử lý song song network traffic và system log. Mô hình chính là Deep Autoencoder cho traffic và LSTM Autoencoder cho log. Hai mô hình được train theo hướng unsupervised, không dùng nhãn attack để học, mà phát hiện anomaly bằng reconstruction error và dynamic threshold. Nhóm em cũng bổ sung Random Forest supervised baseline để so sánh với Autoencoder.
 
-- **LSTM Autoencoder**:
-  - Phân tích chuỗi sự kiện trong nhật ký hệ thống.
-  - Khai thác mối quan hệ theo thời gian giữa các log.
-  - Phát hiện các hành vi khác biệt so với mẫu thông thường.
+Nếu bị hỏi vì sao supervised cao hơn:
 
-### Dynamic Threshold
+> Random Forest có kết quả cao vì được học trực tiếp từ nhãn BENIGN/ATTACK trên cùng phân phối dữ liệu DDoS. Autoencoder không cần nhãn attack khi train nên phù hợp hơn trong tình huống thiếu nhãn hoặc muốn phát hiện bất thường chưa biết, nhưng độ chính xác phụ thuộc nhiều vào threshold và độ khác biệt của attack so với traffic bình thường.
 
-Thay vì sử dụng ngưỡng cố định, hệ thống tự động tính ngưỡng dựa trên phân phối Reconstruction Error của 100 mẫu dữ liệu đầu tiên. Điều này giúp hệ thống có khả năng thích nghi với từng loại dữ liệu đầu vào khác nhau.
+Nếu bị hỏi hạn chế:
 
----
+> Demo hiện mô phỏng realtime bằng CSV, chưa bắt packet live từ card mạng. Traffic CICIDS2017 và log HDFS là hai dataset độc lập nên chưa correlation thật theo timestamp/IP/process. Phần kết hợp hiện được triển khai bằng Hybrid_Status trong cùng pipeline streaming.
 
-## 6. Tiến độ và phân công công việc
+## 16. Hướng phát triển
 
-### Phần kỹ thuật (Đã hoàn thiện 100%)
-
-- Hoàn thành tích hợp hai nguồn dữ liệu:
-  - HDFS System Log.
-  - CICIDS2017 Network Traffic.
-- Xây dựng thành công kiến trúc Streaming Pipeline đa luồng.
-- Triển khai mô hình Deep Autoencoder và LSTM Autoencoder.
-- Áp dụng cơ chế Dynamic Threshold tự động.
-- Đo lường hiệu năng hệ thống thông qua Latency và Memory Usage.
-- Kiểm thử thành công trên các tập dữ liệu tấn công thực tế.
-
----
-
-### Phần báo cáo và Slide (Cần tiếp tục hoàn thiện)
-
-Các nội dung cần bổ sung:
-
-- So sánh chi tiết giữa Supervised Learning và Unsupervised Learning trong bài toán phát hiện bất thường.
-- Giải thích công thức toán học của Autoencoder và cơ chế tính toán Dynamic Threshold.
-- Tổng hợp ảnh chụp màn hình quá trình kiểm thử.
-- Hoàn thiện Slide thuyết trình phục vụ bảo vệ đồ án.
-
----
-
-## 7. Bộ dữ liệu sử dụng
-
-### CICIDS2017
-
-Bộ dữ liệu mô phỏng các loại tấn công mạng phổ biến như:
-- DDoS
-- PortScan
-- Web Attack
-- Infiltration
-
-Được sử dụng để đánh giá khả năng phát hiện bất thường của mô hình Deep Autoencoder.
-
-### HDFS Log Dataset
-
-Dữ liệu nhật ký hệ thống phân tán Hadoop HDFS, được sử dụng để huấn luyện và đánh giá mô hình LSTM Autoencoder trong bài toán phát hiện bất thường trên System Log.
-
----
-
-## 8. Kết luận
-
-Dự án xây dựng thành công một hệ thống giám sát an ninh mạng thời gian thực sử dụng các kỹ thuật học sâu không giám sát. Hệ thống có khả năng phát hiện bất thường trên cả lưu lượng mạng và nhật ký hệ thống, đồng thời tự thích nghi với dữ liệu thông qua cơ chế Dynamic Threshold và cung cấp các chỉ số đánh giá hiệu năng trong quá trình vận hành.
+- Bổ sung live packet capture bằng Scapy hoặc tshark.
+- Dùng dataset traffic-log đồng bộ timestamp để correlation thật.
+- Lưu riêng encoder cho log preprocessing.
+- Thử thêm threshold percentile hoặc adaptive window.
+- Thử thêm các supervised baseline khác như SVM, Logistic Regression hoặc XGBoost.
